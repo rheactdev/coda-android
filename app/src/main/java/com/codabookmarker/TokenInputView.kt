@@ -24,6 +24,11 @@ class TokenInputView(
         setSingleLine(true)
         imeOptions = EditorInfo.IME_ACTION_DONE
         setPadding(dp(6), dp(7), dp(6), dp(7))
+        setTextColor(Color.rgb(242, 243, 247))
+        setHintTextColor(Color.rgb(174, 181, 196))
+        setDropDownBackgroundDrawable(
+            roundedBackground(Color.rgb(26, 29, 36), Color.rgb(61, 67, 82), 1),
+        )
         background = null
     }
     private val allSuggestions = suggestions
@@ -33,7 +38,7 @@ class TokenInputView(
 
     init {
         setPadding(dp(6), dp(5), dp(6), dp(5))
-        background = roundedBackground(Color.WHITE, Color.rgb(200, 206, 221), 1)
+        background = roundedBackground(Color.rgb(34, 38, 48), Color.rgb(61, 67, 82), 1)
         addView(input, LayoutParams(dp(140), dp(42)))
         updateSuggestions()
 
@@ -135,11 +140,11 @@ class TokenInputView(
             addView(TextView(context).apply {
                 text = "$token  ×"
                 textSize = 13f
-                setTextColor(Color.rgb(36, 84, 198))
+                setTextColor(Color.rgb(205, 212, 255))
                 setPadding(dp(10), dp(7), dp(8), dp(7))
                 background = roundedBackground(
-                    Color.rgb(234, 240, 255),
-                    Color.rgb(190, 208, 248),
+                    Color.rgb(48, 55, 91),
+                    Color.rgb(101, 116, 216),
                     1,
                 )
                 setOnClickListener { removeToken(token) }
@@ -156,9 +161,17 @@ class TokenInputView(
         val available = allSuggestions.filter { suggestion ->
             tokens.none { sameValue(it, suggestion) }
         }
-        input.setAdapter(
-            ArrayAdapter(context, android.R.layout.simple_dropdown_item_1line, available),
-        )
+        input.setAdapter(object : ArrayAdapter<String>(
+            context,
+            android.R.layout.simple_dropdown_item_1line,
+            available,
+        ) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+                super.getView(position, convertView, parent).apply {
+                    setBackgroundColor(Color.rgb(26, 29, 36))
+                    (this as? TextView)?.setTextColor(Color.rgb(242, 243, 247))
+                }
+        })
     }
 
     private fun normalize(value: String): String = value.trim().replace(Regex("\\s+"), " ")

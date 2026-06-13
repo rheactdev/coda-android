@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -22,6 +23,21 @@ import android.widget.TextView
 import java.net.URI
 import java.util.UUID
 import java.util.concurrent.Executors
+
+private object DarkPalette {
+    val background = Color.rgb(17, 19, 24)
+    val surface = Color.rgb(26, 29, 36)
+    val input = Color.rgb(34, 38, 48)
+    val border = Color.rgb(61, 67, 82)
+    val primary = Color.rgb(139, 156, 255)
+    val primaryStrong = Color.rgb(101, 116, 216)
+    val text = Color.rgb(242, 243, 247)
+    val muted = Color.rgb(174, 181, 196)
+    val successText = Color.rgb(143, 224, 172)
+    val successSurface = Color.rgb(25, 60, 42)
+    val errorText = Color.rgb(255, 170, 170)
+    val errorSurface = Color.rgb(72, 32, 38)
+}
 
 class MainActivity : Activity() {
     private lateinit var store: AppStore
@@ -61,7 +77,7 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(18), dp(20), dp(24))
-            setBackgroundColor(Color.rgb(247, 248, 251))
+            setBackgroundColor(DarkPalette.background)
         }
 
         root.addView(LinearLayout(this).apply {
@@ -70,7 +86,7 @@ class MainActivity : Activity() {
             addView(TextView(context).apply {
                 text = "Save to Coda"
                 textSize = 24f
-                setTextColor(Color.rgb(23, 32, 51))
+                setTextColor(DarkPalette.text)
                 setTypeface(typeface, android.graphics.Typeface.BOLD)
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             addView(actionButton("Forms") { showFormsDialog() })
@@ -83,11 +99,13 @@ class MainActivity : Activity() {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             minLines = 2
             maxLines = 4
+            applyDarkInputStyle()
         }
         root.addView(urlInput, matchWidth())
 
         root.addView(label("Saved form"), topMargin(16))
         formSpinner = Spinner(this)
+        formSpinner.setBackgroundColor(DarkPalette.input)
         root.addView(formSpinner, matchWidth())
 
         fieldsContainer = LinearLayout(this).apply {
@@ -97,8 +115,8 @@ class MainActivity : Activity() {
 
         saveButton = Button(this).apply {
             text = "Save bookmark"
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.rgb(36, 84, 198))
+            setTextColor(Color.rgb(16, 18, 24))
+            background = roundedBackground(DarkPalette.primary, DarkPalette.primary, 0)
             setOnClickListener { saveBookmark() }
         }
         root.addView(saveButton, topMargin(22))
@@ -127,7 +145,7 @@ class MainActivity : Activity() {
             .filter { it.tokenFingerprint == fingerprint }
             .sortedBy { it.name.lowercase() }
         val labels = if (visibleForms.isEmpty()) listOf("No saved forms") else visibleForms.map { it.name }
-        formSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, labels)
+        formSpinner.adapter = spinnerAdapter(labels)
         val selectedIndex = visibleForms.indexOfFirst { it.id == preferredId }.takeIf { it >= 0 } ?: 0
         if (visibleForms.isNotEmpty()) formSpinner.setSelection(selectedIndex)
         formSpinner.onItemSelectedListener = SimpleItemSelectedListener {
@@ -172,6 +190,7 @@ class MainActivity : Activity() {
                     if (column.options.isNotEmpty()) {
                         hint = column.options.take(4).joinToString(", ")
                     }
+                    applyDarkInputStyle()
                 }
                 ScalarEditor(input)
             }
@@ -285,7 +304,7 @@ class MainActivity : Activity() {
         val columnsPanel = verticalPanel()
         val progress = TextView(this).apply {
             textSize = 13f
-            setTextColor(Color.DKGRAY)
+            setTextColor(DarkPalette.muted)
         }
 
         content.addView(formName)
@@ -365,6 +384,8 @@ class MainActivity : Activity() {
                         columnsPanel.addView(CheckBox(this).apply {
                             text = column.name
                             tag = column.id
+                            setTextColor(DarkPalette.text)
+                            buttonTintList = android.content.res.ColorStateList.valueOf(DarkPalette.primary)
                         })
                     }
                     setDialogBusy(false, "Choose fields shown when sharing.")
@@ -447,9 +468,11 @@ class MainActivity : Activity() {
     private fun showStatus(message: String, error: Boolean) {
         statusView.visibility = View.VISIBLE
         statusView.text = message
-        statusView.setTextColor(if (error) Color.rgb(138, 31, 31) else Color.rgb(18, 91, 44))
-        statusView.setBackgroundColor(
-            if (error) Color.rgb(255, 244, 244) else Color.rgb(241, 251, 244),
+        statusView.setTextColor(if (error) DarkPalette.errorText else DarkPalette.successText)
+        statusView.background = roundedBackground(
+            if (error) DarkPalette.errorSurface else DarkPalette.successSurface,
+            if (error) DarkPalette.errorText else DarkPalette.successText,
+            1,
         )
     }
 
@@ -474,13 +497,15 @@ class MainActivity : Activity() {
     private fun label(text: String) = TextView(this).apply {
         this.text = text
         textSize = 13f
-        setTextColor(Color.rgb(45, 56, 87))
+        setTextColor(DarkPalette.muted)
         setTypeface(typeface, android.graphics.Typeface.BOLD)
     }
 
     private fun actionButton(text: String, action: () -> Unit) = Button(this).apply {
         this.text = text
         textSize = 12f
+        setTextColor(DarkPalette.primary)
+        background = roundedBackground(DarkPalette.surface, DarkPalette.border, 1)
         setOnClickListener { action() }
     }
 
@@ -493,10 +518,12 @@ class MainActivity : Activity() {
             InputType.TYPE_CLASS_TEXT
         }
         setSingleLine(true)
+        applyDarkInputStyle()
     }
 
     private fun verticalPanel() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
+        setBackgroundColor(DarkPalette.surface)
     }
 
     private fun wrapDialog(content: View) = ScrollView(this).apply {
@@ -505,7 +532,34 @@ class MainActivity : Activity() {
     }
 
     private fun spinnerAdapter(items: List<String>) =
-        ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, items)
+        object : ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, items) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+                super.getView(position, convertView, parent).apply {
+                    setBackgroundColor(DarkPalette.input)
+                    (this as? TextView)?.setTextColor(DarkPalette.text)
+                }
+
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View =
+                super.getDropDownView(position, convertView, parent).apply {
+                    setBackgroundColor(DarkPalette.surface)
+                    (this as? TextView)?.setTextColor(DarkPalette.text)
+                }
+        }
+
+    private fun EditText.applyDarkInputStyle() {
+        setTextColor(DarkPalette.text)
+        setHintTextColor(DarkPalette.muted)
+        background = roundedBackground(DarkPalette.input, DarkPalette.border, 1)
+        setPadding(dp(12), dp(10), dp(12), dp(10))
+    }
+
+    private fun roundedBackground(fill: Int, stroke: Int, strokeWidth: Int) =
+        GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(9).toFloat()
+            setColor(fill)
+            if (strokeWidth > 0) setStroke(dp(strokeWidth), stroke)
+        }
 
     private fun matchWidth() = LinearLayout.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT,
