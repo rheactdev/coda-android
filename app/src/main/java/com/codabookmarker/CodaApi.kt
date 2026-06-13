@@ -32,12 +32,29 @@ object CodaApi {
                 ).lowercase()
                 val multiple = format.optBoolean("isArray") ||
                     listOf("select", "lookup", "person", "relation").any(type::contains)
+                val relationTableId = format.optJSONObject("table")?.optString("id")
+                    .orEmpty()
+                    .ifBlank { format.optString("targetTableId") }
+                val options = when {
+                    format.optJSONArray("options") != null ->
+                        format.optJSONArray("options").optionNames()
+                    relationTableId.isNotBlank() -> runCatching {
+                        fetchAll(
+                            "$API_BASE/docs/${encode(docId)}/tables/" +
+                                "${encode(relationTableId)}/rows?useColumnNames=true",
+                            token,
+                        ).mapNotNull { row ->
+                            row.optString("name").takeIf(String::isNotBlank)
+                        }
+                    }.getOrDefault(emptyList())
+                    else -> emptyList()
+                }
                 CodaColumn(
                     id = column.optString("id"),
                     name = column.optString("name", column.optString("id")),
                     type = type,
                     multiple = multiple,
-                    options = format.optJSONArray("options").optionNames(),
+                    options = options.distinctBy(String::lowercase),
                 )
             }
     }

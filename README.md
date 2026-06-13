@@ -13,7 +13,9 @@ Native Android share target for the Coda Express bookmark backend.
 - Discovers Coda docs, tables, and table columns.
 - Saves named forms for quick reuse.
 - Persists manual form values per saved form.
-- Sends multi-value fields as arrays. Enter those values separated by commas.
+- Uses removable token chips for multi-select and relation fields.
+- Suggests existing Coda select options and related-table row names as you type.
+- Supports creating a new token by typing it and pressing Enter or comma.
 
 Credentials and forms are stored in app-private Android preferences. They are not
 included in Android backups and are never logged.

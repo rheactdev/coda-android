@@ -31,7 +31,7 @@ class MainActivity : Activity() {
     private lateinit var statusView: TextView
     private lateinit var saveButton: Button
     private var visibleForms: List<SavedForm> = emptyList()
-    private val fieldInputs = linkedMapOf<CodaColumn, EditText>()
+    private val fieldInputs = linkedMapOf<CodaColumn, FieldEditor>()
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -148,29 +148,35 @@ class MainActivity : Activity() {
         val savedValues = store.loadValues(form.id)
         form.columns.forEach { column ->
             fieldsContainer.addView(label(column.name), topMargin(14))
-            val input = EditText(this).apply {
-                hint = when {
-                    column.multiple -> "Comma-separated values"
+            val stored = savedValues[column.id]
+            val editor = if (column.multiple) {
+                val tokenInput = TokenInputView(this, column.options).apply {
+                    setValues((stored as? List<*>)?.map(Any?::toString).orEmpty())
+                }
+                TokenEditor(tokenInput)
+            } else {
+                val input = EditText(this).apply {
+                    hint = when {
                     column.type.contains("date") -> "YYYY-MM-DD"
                     column.type.contains("url") || column.type.contains("link") -> "https://example.com"
                     else -> ""
+                    }
+                    inputType = when {
+                        column.type.contains("url") || column.type.contains("link") ->
+                            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+                        column.type.contains("number") || column.type.contains("currency") ->
+                            InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+                        else -> InputType.TYPE_CLASS_TEXT
+                    }
+                    setText(stored?.toString().orEmpty())
+                    if (column.options.isNotEmpty()) {
+                        hint = column.options.take(4).joinToString(", ")
+                    }
                 }
-                inputType = when {
-                    column.type.contains("url") || column.type.contains("link") ->
-                        InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-                    column.type.contains("number") || column.type.contains("currency") ->
-                        InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-                    else -> InputType.TYPE_CLASS_TEXT
-                }
-                val stored = savedValues[column.id]
-                setText(if (stored is List<*>) stored.joinToString(", ") else stored?.toString().orEmpty())
+                ScalarEditor(input)
             }
-            if (column.options.isNotEmpty()) {
-                val preview = column.options.take(4).joinToString(", ")
-                input.hint = if (column.multiple) "Options include: $preview" else preview
-            }
-            fieldsContainer.addView(input, matchWidth())
-            fieldInputs[column] = input
+            fieldsContainer.addView(editor.view, matchWidth())
+            fieldInputs[column] = editor
         }
     }
 
@@ -190,11 +196,11 @@ class MainActivity : Activity() {
         }
 
         val selectedForm = requireNotNull(form)
-        val valuesById = fieldInputs.entries.associate { (column, input) ->
-            column.id to parseFieldValue(column, input.text.toString())
+        val valuesById = fieldInputs.entries.associate { (column, editor) ->
+            column.id to editor.value()
         }
-        val valuesByLabel = fieldInputs.entries.associate { (column, input) ->
-            column.name to parseFieldValue(column, input.text.toString())
+        val valuesByLabel = fieldInputs.entries.associate { (column, editor) ->
+            column.name to editor.value()
         }
         store.saveValues(selectedForm.id, valuesById)
         setBusy(true, "Sending bookmark to the backend...")
@@ -434,7 +440,7 @@ class MainActivity : Activity() {
         saveButton.isEnabled = !busy && visibleForms.isNotEmpty()
         formSpinner.isEnabled = !busy
         urlInput.isEnabled = !busy
-        fieldInputs.values.forEach { it.isEnabled = !busy }
+        fieldInputs.values.forEach { it.setEditorEnabled(!busy) }
         if (message.isNotBlank()) showStatus(message, false)
     }
 
@@ -446,13 +452,6 @@ class MainActivity : Activity() {
             if (error) Color.rgb(255, 244, 244) else Color.rgb(241, 251, 244),
         )
     }
-
-    private fun parseFieldValue(column: CodaColumn, raw: String): Any =
-        if (column.multiple) {
-            raw.split(",").map(String::trim).filter(String::isNotBlank).distinct()
-        } else {
-            raw.trim()
-        }
 
     private fun settingsComplete(settings: Settings) =
         validHttpUrl(settings.backendBaseUrl) &&
@@ -516,6 +515,28 @@ class MainActivity : Activity() {
     private fun topMargin(value: Int) = matchWidth().apply { topMargin = dp(value) }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+}
+
+private sealed interface FieldEditor {
+    val view: View
+    fun value(): Any
+    fun setEditorEnabled(enabled: Boolean)
+}
+
+private class ScalarEditor(private val input: EditText) : FieldEditor {
+    override val view: View = input
+    override fun value(): Any = input.text.toString().trim()
+    override fun setEditorEnabled(enabled: Boolean) {
+        input.isEnabled = enabled
+    }
+}
+
+private class TokenEditor(private val input: TokenInputView) : FieldEditor {
+    override val view: View = input
+    override fun value(): Any = input.values()
+    override fun setEditorEnabled(enabled: Boolean) {
+        input.isEnabled = enabled
+    }
 }
 
 private class SimpleItemSelectedListener(
